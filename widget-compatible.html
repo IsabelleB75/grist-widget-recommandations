@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Widget Recommandations Compatible</title>
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 15px;
+      line-height: 1.5;
+    }
+    h2 {
+      color: #2c3e50;
+    }
+    .container {
+      max-width: 800px;
+      border: 1px solid #ddd;
+      padding: 15px;
+      border-radius: 5px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+    }
+    th {
+      background-color: #f2f2f2;
+    }
+    tr:nth-child(even) {
+      background-color: #f9f9f9;
+    }
+    .message {
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 4px;
+    }
+    .info {
+      background-color: #e3f2fd;
+      color: #1565c0;
+    }
+    .success {
+      background-color: #e8f5e9;
+      color: #2e7d32;
+    }
+    .error {
+      background-color: #ffebee;
+      color: #c62828;
+    }
+    button {
+      padding: 8px 15px;
+      background-color: #4285f4;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 5px;
+    }
+    button:hover {
+      background-color: #2a75f3;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Liste des Recommandations</h2>
+    <div id="message" class="message info">Initialisation du widget...</div>
+    
+    <div id="tableContainer">
+      <table id="recommandationsTable">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Prénom</th>
+            <th>Nom</th>
+            <th>Titre</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          <!-- Les données seront chargées ici -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    // Variables globales
+    let tableData = [];
+    
+    // Fonction pour afficher un message
+    function showMessage(message, type = 'info') {
+      const msgElement = document.getElementById('message');
+      msgElement.textContent = message;
+      msgElement.className = 'message ' + type;
+    }
+    
+    // Fonction pour charger les données depuis Grist
+    function loadData() {
+      showMessage("Tentative de communication avec Grist...");
+      
+      // Vérifier si l'API Grist est disponible
+      if (typeof grist === 'undefined') {
+        showMessage("L'API Grist n'est pas disponible", 'error');
+        return;
+      }
+      
+      try {
+        // Initialisation adaptée pour les anciennes versions de Grist
+        if (typeof grist.ready === 'function') {
+          try {
+            // Version 1: Sans paramètres (ancien style)
+            grist.ready();
+            showMessage("Connexion à Grist établie", 'success');
+          } catch (e) {
+            console.error("Erreur avec grist.ready sans paramètres:", e);
+            try {
+              // Version 2: Avec callback (style intermédiaire)
+              grist.ready(function() {
+                showMessage("Connexion à Grist établie (mode callback)", 'success');
+              });
+            } catch (e2) {
+              showMessage("Impossible d'initialiser Grist: " + e2.message, 'error');
+            }
+          }
+        } else {
+          showMessage("La fonction grist.ready n'est pas disponible", 'error');
+        }
+        
+        // Configuration de l'écouteur de données (plusieurs tentatives)
+        setupDataListener();
+        
+      } catch (error) {
+        showMessage("Erreur générale: " + error.message, 'error');
+      }
+    }
+    
+    // Configuration de l'écouteur de données
+    function setupDataListener() {
+      if (typeof grist.onRecords === 'function') {
+        try {
+          grist.onRecords(handleRecords);
+          console.log("grist.onRecords configuré");
+        } catch (e) {
+          showMessage("Erreur lors de la configuration de onRecords: " + e.message, 'error');
+        }
+      } else if (typeof grist.onRecord === 'function') {
+        try {
+          grist.onRecord(function(record) {
+            handleRecords([record]);
+          });
+          console.log("grist.onRecord configuré comme alternative");
+        } catch (e) {
+          showMessage("Erreur lors de la configuration de onRecord: " + e.message, 'error');
+        }
+      } else {
+        showMessage("Aucune méthode de réception de données n'est disponible", 'error');
+      }
+    }
+    
+    // Traitement des enregistrements reçus
+    function handleRecords(records) {
+      console.log("Données reçues:", records);
+      
+      if (!records || records.length === 0) {
+        showMessage("Aucune donnée reçue de Grist", 'info');
+        return;
+      }
+      
+      // Stocker les données
+      tableData = records;
+      
+      // Afficher les données dans le tableau
+      const tableBody = document.getElementById('tableBody');
+      tableBody.innerHTML = '';
+      
+      records.forEach(function(record) {
+        const row = document.createElement('tr');
+        
+        // ID
+        const idCell = document.createElement('td');
+        idCell.textContent = record.id || '';
+        row.appendChild(idCell);
+        
+        // Prénom
+        const prenomCell = document.createElement('td');
+        prenomCell.textContent = record.prenom || '';
+        row.appendChild(prenomCell);
+        
+        // Nom
+        const nomCell = document.createElement('td');
+        nomCell.textContent = record.nom || '';
+        row.appendChild(nomCell);
+        
+        // Titre
+        const titreCell = document.createElement('td');
+        titreCell.textContent = record.titre_recommandations || '';
+        row.appendChild(titreCell);
+        
+        // Description (version courte)
+        const descCell = document.createElement('td');
+        const desc = record.description || '';
+        descCell.textContent = desc.length > 50 ? desc.substring(0, 50) + '...' : desc;
+        row.appendChild(descCell);
+        
+        // Ajouter la ligne au tableau
+        tableBody.appendChild(row);
+      });
+      
+      showMessage("Données chargées avec succès: " + records.length + " enregistrements", 'success');
+    }
+    
+    // Exécuter au chargement de la page
+    window.onload = function() {
+      showMessage("Widget chargé, tentative de connexion à Grist...");
+      setTimeout(loadData, 500); // Petit délai pour s'assurer que tout est bien chargé
+    };
+  </script>
+</body>
+</html>
