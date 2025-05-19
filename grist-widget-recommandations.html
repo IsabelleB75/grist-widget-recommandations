@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Modifier une recommandation</title>
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+</head>
+<body>
+  <h2>Modifier une recommandation</h2>
+
+  <label for="recordSelect">Sélectionnez une recommandation :</label>
+  <select id="recordSelect"></select>
+
+  <form id="recoForm" style="margin-top:20px;">
+    <label>Prénom : <input type="text" id="prenom" disabled></label><br><br>
+    <label>Nom : <input type="text" id="nom" disabled></label><br><br>
+    <label>Email : <input type="email" id="email" disabled></label><br><br>
+    <label>Titre : <input type="text" id="titre_recommandations"></label><br><br>
+    <label>Description :<br>
+      <textarea id="description" rows="4" cols="50"></textarea>
+    </label><br><br>
+    <label>Commentaires :<br>
+      <textarea id="commentaires" rows="4" cols="50"></textarea>
+    </label><br><br>
+    <label>Pièce jointe :
+      <input type="file" id="pieces_jointes">
+    </label><br><br>
+    <button type="submit">Enregistrer</button>
+  </form>
+
+  <p id="status"></p>
+
+  <script>
+    let currentUserEmail = null;
+    let allRecords = [];
+    let currentRecord = null;
+
+    grist.ready({requiredAccess: 'full'});
+
+    grist.onUser(user => {
+      currentUserEmail = user.email;
+    });
+
+    grist.onRecords(records => {
+      allRecords = records;
+      const select = document.getElementById('recordSelect');
+      select.innerHTML = '';
+      records.forEach(r => {
+        const option = document.createElement('option');
+        option.value = r.id;
+        option.text = `${r.prenom || ''} ${r.nom || ''} - ${r.titre_recommandations || 'Sans titre'}`;
+        select.appendChild(option);
+      });
+
+      if (records.length > 0) {
+        select.value = records[0].id;
+        loadRecord(records[0].id);
+      }
+    });
+
+    document.getElementById('recordSelect').addEventListener('change', (e) => {
+      const selectedId = parseInt(e.target.value);
+      loadRecord(selectedId);
+    });
+
+    function loadRecord(recordId) {
+      currentRecord = allRecords.find(r => r.id === recordId);
+      if (!currentRecord) return;
+
+      document.getElementById('prenom').value = currentRecord.prenom || '';
+      document.getElementById('nom').value = currentRecord.nom || '';
+      document.getElementById('email').value = currentRecord.email || '';
+      document.getElementById('titre_recommandations').value = currentRecord.titre_recommandations || '';
+      document.getElementById('description').value = currentRecord.description || '';
+      document.getElementById('commentaires').value = currentRecord.commentaires || '';
+      document.getElementById('status').textContent = '';
+    }
+
+    document.getElementById('recoForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      if (!currentRecord) return;
+
+      if (currentRecord.email !== currentUserEmail) {
+        document.getElementById('status').textContent = "❌ Vous ne pouvez modifier que vos propres recommandations.";
+        return;
+      }
+
+      const updates = {
+        titre_recommandations: document.getElementById('titre_recommandations').value,
+        description: document.getElementById('description').value,
+        commentaires: document.getElementById('commentaires').value
+      };
+
+      const fileInput = document.getElementById('pieces_jointes');
+      if (fileInput.files.length > 0) {
+        const file = fileInput.files[0];
+        const uploadUrl = await grist.docApi.uploadAttachment(file);
+        updates.pieces_jointes = uploadUrl;
+      }
+
+      await grist.updateRecord(currentRecord.id, updates);
+      document.getElementById('status').textContent = "✅ Recommandation mise à jour avec succès !";
+    });
+  </script>
+</body>
+</html>
