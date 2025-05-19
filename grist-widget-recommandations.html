@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Modifier une recommandation</title>
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      line-height: 1.6;
+    }
+    .container {
+      border: 1px solid #ddd;
+      padding: 20px;
+      border-radius: 5px;
+    }
+    h2 {
+      color: #2c3e50;
+      margin-bottom: 20px;
+    }
+    select, input, textarea {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    textarea {
+      min-height: 100px;
+    }
+    button {
+      background-color: #3498db;
+      color: white;
+      padding: 10px 15px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    button:hover {
+      background-color: #2980b9;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    .success {
+      color: #27ae60;
+      padding: 10px;
+      background-color: #e8f8f5;
+      border-radius: 4px;
+      margin-top: 10px;
+    }
+    .error {
+      color: #e74c3c;
+      padding: 10px;
+      background-color: #fadbd8;
+      border-radius: 4px;
+      margin-top: 10px;
+    }
+    .read-only {
+      background-color: #f5f5f5;
+    }
+    .hidden {
+      display: none;
+    }
+    #loadingIndicator {
+      text-align: center;
+      padding: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Modifier une recommandation</h2>
+    
+    <div id="loadingIndicator">Chargement des données...</div>
+    
+    <div id="contentContainer" class="hidden">
+      <div class="form-group">
+        <label for="recordSelect">Sélectionnez une recommandation :</label>
+        <select id="recordSelect"></select>
+      </div>
+      
+      <form id="recoForm">
+        <div class="form-group">
+          <label for="prenom">Prénom :</label>
+          <input type="text" id="prenom" class="read-only" disabled>
+        </div>
+        
+        <div class="form-group">
+          <label for="nom">Nom :</label>
+          <input type="text" id="nom" class="read-only" disabled>
+        </div>
+        
+        <div class="form-group">
+          <label for="email">Email :</label>
+          <input type="email" id="email" class="read-only" disabled>
+        </div>
+        
+        <div class="form-group">
+          <label for="titre_recommandations">Titre :</label>
+          <input type="text" id="titre_recommandations">
+        </div>
+        
+        <div class="form-group">
+          <label for="description">Description :</label>
+          <textarea id="description" rows="4"></textarea>
+        </div>
+        
+        <div class="form-group">
+          <label for="commentaires">Commentaires :</label>
+          <textarea id="commentaires" rows="4"></textarea>
+        </div>
+        
+        <div class="form-group">
+          <label for="pieces_jointes">Pièce jointe :</label>
+          <input type="file" id="pieces_jointes">
+        </div>
+        
+        <button type="submit" id="saveButton">Enregistrer</button>
+      </form>
+      
+      <div id="status" class="hidden"></div>
+    </div>
+    
+    <div id="errorContainer" class="error hidden">
+      Une erreur s'est produite lors de la communication avec Grist. Veuillez vérifier que le widget est correctement configuré.
+    </div>
+  </div>
+
+  <script>
+    // Variables globales
+    let currentUserEmail = null;
+    let allRecords = [];
+    let currentRecord = null;
+    
+    // Fonctions d'aide pour l'interface
+    function showLoading() {
+      document.getElementById('loadingIndicator').classList.remove('hidden');
+      document.getElementById('contentContainer').classList.add('hidden');
+      document.getElementById('errorContainer').classList.add('hidden');
+    }
+    
+    function showContent() {
+      document.getElementById('loadingIndicator').classList.add('hidden');
+      document.getElementById('contentContainer').classList.remove('hidden');
+      document.getElementById('errorContainer').classList.add('hidden');
+    }
+    
+    function showError() {
+      document.getElementById('loadingIndicator').classList.add('hidden');
+      document.getElementById('contentContainer').classList.add('hidden');
+      document.getElementById('errorContainer').classList.remove('hidden');
+    }
+    
+    function showStatus(message, isError = false) {
+      const statusElem = document.getElementById('status');
+      statusElem.textContent = message;
+      statusElem.classList.remove('hidden', 'success', 'error');
+      statusElem.classList.add(isError ? 'error' : 'success');
+      
+      // Masquer après 5 secondes
+      setTimeout(() => {
+        statusElem.classList.add('hidden');
+      }, 5000);
+    }
+    
+    // Initialisation Grist
+    function initGrist() {
+      try {
+        console.log("Initialisation de Grist...");
+        
+        // Méthode 1 : Initialisation synchrone de Grist
+        if (typeof grist !== 'undefined' && typeof grist.ready === 'function') {
+          grist.ready({requiredAccess: 'full'});
+          console.log("Grist initialisé avec succès");
+          
+          // Configuration des écouteurs
+          setupEventListeners();
+          return true;
+        }
+        
+        console.error("L'API Grist n'est pas disponible");
+        return false;
+      } catch (error) {
+        console.error("Erreur lors de l'initialisation de Grist:", error);
+        return false;
+      }
+    }
+    
+    // Configuration des écouteurs d'événements Grist
+    function setupEventListeners() {
+      // Obtenir l'utilisateur actuel
+      if (typeof grist.onUser === 'function') {
+        grist.onUser(user => {
+          console.log("Utilisateur Grist détecté:", user);
+          currentUserEmail = user.email;
+        });
+      }
+      
+      // Obtenir les enregistrements
+      if (typeof grist.onRecords === 'function') {
+        grist.onRecords(records => {
+          console.log("Enregistrements reçus:", records ? records.length : 0);
+          
+          if (!records || records.length === 0) {
+            showContent();
+            showStatus("Aucune recommandation disponible", true);
+            return;
+          }
+          
+          allRecords = records;
+          populateRecordSelect(records);
+          showContent();
+        });
+      } else {
+        showError();
+      }
+    }
+    
+    // Remplir le sélecteur d'enregistrements
+    function populateRecordSelect(records) {
+      const select = document.getElementById('recordSelect');
+      select.innerHTML = '';
+      
+      records.forEach(r => {
+        const option = document.createElement('option');
+        option.value = r.id;
+        option.text = `${r.prenom || ''} ${r.nom || ''} - ${r.titre_recommandations || 'Sans titre'}`;
+        select.appendChild(option);
+      });
+      
+      if (records.length > 0) {
+        select.value = records[0].id;
+        loadRecord(records[0].id);
+      }
+    }
+    
+    // Charger un enregistrement spécifique
+    function loadRecord(recordId) {
+      currentRecord = allRecords.find(r => r.id === recordId);
+      if (!currentRecord) return;
+      
+      document.getElementById('prenom').value = currentRecord.prenom || '';
+      document.getElementById('nom').value = currentRecord.nom || '';
+      document.getElementById('email').value = currentRecord.email || '';
+      document.getElementById('titre_recommandations').value = currentRecord.titre_recommandations || '';
+      document.getElementById('description').value = currentRecord.description || '';
+      document.getElementById('commentaires').value = currentRecord.commentaires || '';
+      
+      // Vérifier si l'utilisateur peut modifier cet enregistrement
+      const canEdit = currentUserEmail === currentRecord.email;
+      
+      const editableFields = [
+        'titre_recommandations',
+        'description',
+        'commentaires',
+        'pieces_jointes'
+      ];
+      
+      // Activer/désactiver les champs en fonction des droits
+      editableFields.forEach(field => {
+        const element = document.getElementById(field);
+        if (element) {
+          element.disabled = !canEdit;
+          if (canEdit) {
+            element.classList.remove('read-only');
+          } else {
+            element.classList.add('read-only');
+          }
+        }
+      });
+      
+      // Activer/désactiver le bouton d'enregistrement
+      document.getElementById('saveButton').disabled = !canEdit;
+      
+      if (!canEdit) {
+        showStatus("Vous ne pouvez modifier que vos propres recommandations", true);
+      }
+    }
+    
+    // Enregistrer les modifications
+    async function saveRecord(recordId, updates) {
+      try {
+        console.log("Tentative d'enregistrement pour l'ID", recordId, "avec les données:", updates);
+        
+        // Méthode 1: Essayer updateRecord
+        if (typeof grist.updateRecord === 'function') {
+          await grist.updateRecord(recordId, updates);
+          showStatus("✅ Recommandation mise à jour avec succès !");
+          return true;
+        }
+        
+        // Méthode 2: Essayer setValues (ancienne API)
+        if (typeof grist.setValues === 'function') {
+          grist.setValues(recordId, updates);
+          showStatus("✅ Recommandation mise à jour avec succès !");
+          return true;
+        }
+        
+        showStatus("Aucune méthode d'enregistrement disponible", true);
+        return false;
+      } catch (error) {
+        console.error("Erreur lors de l'enregistrement:", error);
+        showStatus("❌ Erreur: " + error.message, true);
+        return false;
+      }
+    }
+    
+    // Événements du document
+    document.addEventListener('DOMContentLoaded', function() {
+      console.log("DOM chargé, initialisation du widget...");
+      showLoading();
+      
+      const success = initGrist();
+      if (!success) {
+        showError();
+      }
+      
+      // Événement de changement de sélection
+      document.getElementById('recordSelect').addEventListener('change', (e) => {
+        const selectedId = parseInt(e.target.value);
+        loadRecord(selectedId);
+      });
+      
+      // Événement de soumission du formulaire
+      document.getElementById('recoForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        if (!currentRecord) {
+          showStatus("Aucun enregistrement sélectionné", true);
+          return;
+        }
+        
+        if (currentRecord.email !== currentUserEmail) {
+          showStatus("❌ Vous ne pouvez modifier que vos propres recommandations", true);
+          return;
+        }
+        
+        // Collecter les mises à jour
+        const updates = {
+          titre_recommandations: document.getElementById('titre_recommandations').value,
+          description: document.getElementById('description').value,
+          commentaires: document.getElementById('commentaires').value
+        };
+        
+        // Gérer les pièces jointes
+        const fileInput = document.getElementById('pieces_jointes');
+        if (fileInput.files.length > 0) {
+          try {
+            const file = fileInput.files[0];
+            if (typeof grist.docApi !== 'undefined' && typeof grist.docApi.uploadAttachment === 'function') {
+              const uploadUrl = await grist.docApi.uploadAttachment(file);
+              updates.pieces_jointes = uploadUrl;
+            } else {
+              showStatus("❌ L'API de pièces jointes n'est pas disponible", true);
+            }
+          } catch (error) {
+            console.error("Erreur lors de l'upload de la pièce jointe:", error);
+          }
+        }
+        
+        // Enregistrer les modifications
+        await saveRecord(currentRecord.id, updates);
+      });
+    });
+  </script>
+</body>
+</html>
