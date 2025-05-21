@@ -5,8 +5,8 @@
   <title>Éditeur de commentaire Grist</title>
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
   <style>
-    body { font-family: sans-serif; background: #f4f7fa; }
-    h2 { margin-bottom: 0.2em; }
+    body { font-family: sans-serif; background: #f4f7fa; padding: 12px; margin: 0; }
+    h2 { margin-bottom: 0.2em; color: #336; }
     textarea {
       width: 100%; min-height: 150px;
       background: #ffe6f0; border: 2px solid #336;
@@ -16,57 +16,189 @@
     }
     #status {
       font-style: italic;
-      color: green;
-      margin-bottom: 0.5em;
+      padding: 8px;
+      margin: 8px 0;
+      border-radius: 4px;
     }
-    #status.error { color: red; }
+    #status.success { color: green; background: #e8ffe8; }
+    #status.error { color: red; background: #ffecec; }
+    #status.info { color: #336; background: #e8f0ff; }
+    #debug {
+      padding: 8px;
+      background: #f8f8f8;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 12px;
+      max-height: 100px;
+      overflow: auto;
+      margin-top: 8px;
+      display: none;
+    }
   </style>
 </head>
 <body>
   <h2>Commentaire pour cette demande</h2>
-  <textarea id="editor" placeholder="Écris ton commentaire ici..."></textarea>
-  <div id="status"></div>
+  <textarea id="editor" placeholder="Écris ton commentaire ici..." disabled></textarea>
+  <div id="status" class="info">Initialisation...</div>
+  <div id="debug"></div>
+
   <script>
+    // Variables globales
     let currentRowId = null;
     let currentColumn = "commentaires";
-    let currentTable = "demande_d_achat"; // Le nom exact de ta table
-
-    grist.ready({
-      requiredAccess: 'full',
-      columns: [{ name: "commentaires", title: "Commentaire", type: "Text" }]
-    });
-
-    const textarea = document.getElementById("editor");
-    const status = document.getElementById("status");
-
-    grist.onRecord((record, mappings) => {
+    let currentTable = null;  // Sera déterminé automatiquement
+    let debugMode = false;    // Activer pour voir les messages de débogage
+    
+    // Fonction pour écrire des messages de débogage
+    function logDebug(message) {
+      const debug = document.getElementById("debug");
+      if (debugMode) {
+        debug.style.display = "block";
+        debug.innerHTML += message + "<br>";
+        debug.scrollTop = debug.scrollHeight;
+      }
+    }
+    
+    // Mettre à jour le statut
+    function updateStatus(message, type = "info") {
+      const status = document.getElementById("status");
+      status.textContent = message;
+      status.className = type;
+    }
+    
+    // Fonction principale qui initialise le widget
+    async function initializeWidget() {
+      const editor = document.getElementById("editor");
+      
+      try {
+        // Initialiser l'API Grist
+        await grist.ready({requiredAccess: 'full'});
+        logDebug("API Grist initialisée");
+        
+        // Trouver automatiquement la table demande_d_achat
+        try {
+          const tables = await grist.docApi.listTables();
+          logDebug("Tables disponibles: " + JSON.stringify(tables));
+          
+          // Chercher la table demande_d_achat
+          const targetTableName = "demande_d_achat";
+          if (tables.includes(targetTableName)) {
+            currentTable = targetTableName;
+            logDebug(`Table '${targetTableName}' trouvée`);
+            updateStatus(`Table '${targetTableName}' trouvée`, "success");
+          } else {
+            // Essayer avec d'autres variations du nom
+            const variations = [
+              "DEMANDE_D_ACHAT",
+              "Demande_d_achat",
+              "demande_d_achat",
+              "demandes_d_achat"
+            ];
+            
+            for (const variation of variations) {
+              if (tables.includes(variation)) {
+                currentTable = variation;
+                logDebug(`Table trouvée avec variation: '${variation}'`);
+                updateStatus(`Table trouvée avec variation: '${variation}'`, "success");
+                break;
+              }
+            }
+            
+            // Si aucune variation ne correspond
+            if (!currentTable) {
+              // Dernière tentative: utiliser la première table qui contient "achat"
+              const achatTable = tables.find(t => t.toLowerCase().includes("achat"));
+              if (achatTable) {
+                currentTable = achatTable;
+                logDebug(`Table connexe trouvée: '${achatTable}'`);
+                updateStatus(`Table connexe trouvée: '${achatTable}'`, "success");
+              } else {
+                throw new Error(`Table '${targetTableName}' non trouvée dans la liste des tables disponibles: ${tables.join(", ")}`);
+              }
+            }
+          }
+          
+          // Configurer les colonnes une fois la table trouvée
+          grist.onRecord(handleRecordChange);
+          editor.disabled = false;
+          
+        } catch (err) {
+          logDebug("Erreur lors de la recherche de la table: " + err.message);
+          updateStatus("Erreur: Impossible de trouver la table de demandes d'achat", "error");
+          throw err;
+        }
+        
+      } catch (err) {
+        logDebug("Erreur d'initialisation: " + err.message);
+        updateStatus("Erreur d'initialisation: " + err.message, "error");
+        editor.disabled = true;
+      }
+    }
+    
+    // Fonction pour gérer les modifications des enregistrements
+    function handleRecordChange(record, mappings) {
+      const editor = document.getElementById("editor");
+      
       if (record && record.id) {
         currentRowId = record.id;
-        textarea.value = record.fields[currentColumn] || "";
-        status.textContent = "Commentaire chargé.";
-        status.classList.remove("error");
+        editor.value = record.fields[currentColumn] || "";
+        updateStatus("Commentaire chargé", "success");
+        logDebug(`Enregistrement reçu: ID=${currentRowId}, valeur="${editor.value}"`);
       } else {
         currentRowId = null;
-        textarea.value = "";
-        status.textContent = "Aucune ligne sélectionnée.";
-        status.classList.remove("error");
+        editor.value = "";
+        updateStatus("Aucune ligne sélectionnée", "info");
+        logDebug("Aucun enregistrement sélectionné");
       }
-    });
-
-    textarea.addEventListener("input", async () => {
-      if (!currentRowId) return;
-      const newValue = textarea.value;
+    }
+    
+    // Fonction pour sauvegarder les données
+    async function saveData(newValue) {
+      if (!currentRowId || !currentTable) {
+        updateStatus("Impossible d'enregistrer: aucune ligne sélectionnée ou table non trouvée", "error");
+        return;
+      }
+      
       try {
+        logDebug(`Tentative de mise à jour: table=${currentTable}, id=${currentRowId}, ${currentColumn}="${newValue}"`);
+        
         await grist.docApi.applyUserActions([
           ["UpdateRecord", currentTable, currentRowId, { [currentColumn]: newValue }]
         ]);
-        status.textContent = "✅ Enregistré !";
-        status.classList.remove("error");
+        
+        updateStatus("✅ Enregistré !", "success");
+        logDebug("Enregistrement réussi");
       } catch (err) {
         console.error("Erreur d'enregistrement :", err);
-        status.textContent = "❌ Erreur d'enregistrement : " + (err?.message || err);
-        status.classList.add("error");
+        updateStatus("❌ Erreur: " + (err?.message || err), "error");
+        logDebug("ERREUR: " + JSON.stringify(err));
       }
+    }
+    
+    // Événement de chargement de la page
+    window.addEventListener('DOMContentLoaded', () => {
+      const editor = document.getElementById("editor");
+      
+      // Initialiser le widget avec un léger délai pour s'assurer que l'API est chargée
+      setTimeout(initializeWidget, 500);
+      
+      // Gérer les modifications de texte
+      editor.addEventListener("input", () => {
+        const newValue = editor.value;
+        saveData(newValue);
+      });
+      
+      // Afficher les messages de débogage lors du double-clic sur le statut
+      document.getElementById("status").addEventListener("dblclick", () => {
+        debugMode = !debugMode;
+        document.getElementById("debug").style.display = debugMode ? "block" : "none";
+        if (debugMode) {
+          updateStatus("Mode débogage activé", "info");
+        } else {
+          updateStatus("Mode débogage désactivé", "info");
+        }
+      });
     });
   </script>
 </body>
