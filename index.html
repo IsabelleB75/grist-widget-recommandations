@@ -62,7 +62,7 @@
 
       try {
         await grist.docApi.applyUserActions([
-          ["UpdateRecord", "demande_d_achat", currentRowId, { [currentColumn]: newValue }]
+          ["UpdateRecord", grist.tableId, currentRowId, { [currentColumn]: newValue }]
         ]);
         status.textContent = "✅ Enregistré !";
         status.classList.remove("error");
@@ -75,4 +75,3 @@
   </script>
 </body>
 </html>
-
