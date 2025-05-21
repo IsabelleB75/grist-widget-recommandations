@@ -2,54 +2,57 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Analyseur de Tables Grist</title>
+  <title>Vérificateur de Déploiement</title>
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
   <style>
-    body { 
-      font-family: sans-serif; 
-      margin: 0; 
-      padding: 10px;
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      padding: 15px;
       background-color: #f5f5f5;
     }
     .container {
-      max-width: 100%;
-      margin: 0 auto;
       background: white;
       padding: 15px;
       border-radius: 8px;
       box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
-    h2 { margin-top: 0; color: #333; }
-    .section {
-      margin-bottom: 20px;
-      padding: 10px;
-      background-color: #f9f9f9;
-      border-radius: 4px;
-      border-left: 4px solid #4285f4;
-    }
-    .section h3 {
+    h2 {
       margin-top: 0;
-      color: #4285f4;
+      color: #444;
+      border-bottom: 2px solid #eee;
+      padding-bottom: 10px;
     }
-    #message {
-      margin: 10px 0;
+    .version {
+      font-weight: bold;
+      color: #4285f4;
+      font-size: 1.2em;
+    }
+    .timestamp {
+      color: #666;
+      font-style: italic;
+      margin-bottom: 15px;
+    }
+    .status {
+      margin: 15px 0;
       padding: 10px;
       border-radius: 4px;
+      font-weight: bold;
     }
-    .error { 
-      background-color: #fde0e0; 
-      color: #a92222;
-      border-left: 4px solid #a92222;
+    .success {
+      background-color: #d4edda;
+      color: #155724;
+      border-left: 4px solid #28a745;
     }
-    .success { 
-      background-color: #e0f7e0; 
-      color: #1e7b1e;
-      border-left: 4px solid #1e7b1e;
+    .error {
+      background-color: #f8d7da;
+      color: #721c24;
+      border-left: 4px solid #dc3545;
     }
-    .info { 
-      background-color: #e0f0ff; 
-      color: #0056b3;
-      border-left: 4px solid #0056b3;
+    .pending {
+      background-color: #fff3cd;
+      color: #856404;
+      border-left: 4px solid #ffc107;
     }
     button {
       padding: 8px 15px;
@@ -58,384 +61,155 @@
       border: none;
       border-radius: 4px;
       cursor: pointer;
-      margin: 5px;
+      margin: 5px 0;
     }
     button:hover {
-      background: #3367d6;
+      background: #3b78e7;
     }
-    button:disabled {
-      background: #cccccc;
-      cursor: not-allowed;
-    }
-    .results {
+    .table-info {
       margin-top: 15px;
-      overflow: auto;
-      max-height: 300px;
-      border: 1px solid #ddd;
       padding: 10px;
-      background: white;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    th, td {
-      padding: 8px;
-      text-align: left;
-      border-bottom: 1px solid #ddd;
-    }
-    th {
-      background-color: #f2f2f2;
-    }
-    tr:hover {
-      background-color: #f5f5f5;
-    }
-    .test-section {
-      margin-top: 20px;
-      padding: 15px;
-      border: 1px dashed #ccc;
+      background: #f8f9fa;
       border-radius: 4px;
+      font-family: monospace;
+      max-height: 150px;
+      overflow-y: auto;
     }
-    textarea {
-      width: 100%;
-      height: 100px;
-      margin-top: 10px;
-      padding: 8px;
-      box-sizing: border-box;
-      border: 1px solid #ddd;
-      border-radius: 4px;
+    #table-list {
+      list-style-type: none;
+      padding-left: 0;
     }
-    .hidden {
-      display: none;
+    #table-list li {
+      padding: 4px 0;
+      border-bottom: 1px solid #eee;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <h2>Analyseur de Tables Grist</h2>
+    <h2>Vérificateur de Déploiement</h2>
     
-    <div id="message" class="info">Initialisation...</div>
+    <!-- Version du widget pour vérifier le déploiement -->
+    <div class="version">Version: 1.0.3</div>
+    <div class="timestamp">Déployé le: 21 Mai 2025 à 16:45</div>
     
-    <div class="section">
-      <h3>Analyse du document</h3>
-      <button id="analyzeTables">Analyser les tables</button>
-      <button id="listColumns">Lister les colonnes</button>
-      <button id="showMetadata">Afficher les métadonnées</button>
-    </div>
+    <!-- Statut de la connexion à Grist -->
+    <div id="status" class="status pending">Vérification de la connexion à Grist...</div>
     
-    <div id="results" class="results hidden"></div>
+    <!-- Boutons de test -->
+    <button id="test-connection">Tester la connexion</button>
+    <button id="list-tables">Lister les tables</button>
     
-    <div id="testSection" class="test-section hidden">
-      <h3>Test d'écriture dans la table</h3>
-      <div>
-        <label for="tableSelect">Table à utiliser:</label>
-        <select id="tableSelect"></select>
-      </div>
-      <div>
-        <label for="rowIdInput">ID de la ligne:</label>
-        <input type="number" id="rowIdInput" min="1" value="1" style="width: 60px;">
-      </div>
-      <div>
-        <label for="commentInput">Commentaire:</label>
-        <textarea id="commentInput" placeholder="Entrez un commentaire de test..."></textarea>
-      </div>
-      <button id="testWriteBtn">Tester l'écriture</button>
-      <div id="testResult" class="info" style="margin-top: 10px;"></div>
+    <!-- Informations sur les tables -->
+    <div class="table-info" style="display: none;">
+      <h3>Tables disponibles:</h3>
+      <ul id="table-list"></ul>
     </div>
   </div>
 
   <script>
-    // Variables globales
-    const message = document.getElementById('message');
-    const results = document.getElementById('results');
-    const analyzeTables = document.getElementById('analyzeTables');
-    const listColumns = document.getElementById('listColumns');
-    const showMetadata = document.getElementById('showMetadata');
-    const testSection = document.getElementById('testSection');
-    const tableSelect = document.getElementById('tableSelect');
-    const rowIdInput = document.getElementById('rowIdInput');
-    const commentInput = document.getElementById('commentInput');
-    const testWriteBtn = document.getElementById('testWriteBtn');
-    const testResult = document.getElementById('testResult');
+    // Éléments du DOM
+    const statusEl = document.getElementById('status');
+    const testBtn = document.getElementById('test-connection');
+    const listTablesBtn = document.getElementById('list-tables');
+    const tableInfo = document.querySelector('.table-info');
+    const tableList = document.getElementById('table-list');
     
-    let allTables = [];
-    let tableMap = {};
-    
-    // Fonction pour afficher un message
-    function showMessage(text, type = 'info') {
-      message.textContent = text;
-      message.className = type;
+    // Fonction pour mettre à jour le statut
+    function updateStatus(message, type) {
+      statusEl.textContent = message;
+      statusEl.className = 'status ' + type;
     }
     
-    // Fonction pour afficher les résultats
-    function showResults(content) {
-      results.innerHTML = content;
-      results.classList.remove('hidden');
-    }
-    
-    // Fonction pour initialiser Grist
+    // Fonction pour initialiser la connexion à Grist
     async function initGrist() {
       try {
-        await grist.ready({requiredAccess: 'full'});
-        showMessage("Connexion à Grist établie", "success");
+        // Vérifier si l'API Grist est disponible
+        if (typeof grist === 'undefined') {
+          updateStatus("API Grist non disponible. Vérifiez que le widget est déployé dans Grist.", "error");
+          return false;
+        }
         
-        // Activer les boutons
-        analyzeTables.disabled = false;
-        listColumns.disabled = false;
-        showMetadata.disabled = false;
+        // Initialiser l'API
+        await grist.ready({requiredAccess: 'read'});
+        updateStatus("Connexion à Grist établie avec succès!", "success");
+        console.log("[Vérificateur] Connexion établie à", new Date().toLocaleTimeString());
+        return true;
       } catch (err) {
-        showMessage("Erreur d'initialisation: " + err.message, "error");
-        console.error("Erreur d'initialisation:", err);
+        updateStatus("Erreur de connexion à Grist: " + err.message, "error");
+        console.error("[Vérificateur] Erreur:", err);
+        return false;
       }
     }
     
-    // Fonction pour analyser les tables
-    async function analyzeTablesFunc() {
+    // Fonction pour tester la connexion
+    async function testConnection() {
+      updateStatus("Test de connexion en cours...", "pending");
+      const success = await initGrist();
+      
+      if (success) {
+        // Afficher des informations sur la session
+        console.log("[Vérificateur] Widget déployé et connecté à Grist");
+      }
+    }
+    
+    // Fonction pour lister les tables
+    async function listTables() {
       try {
-        showMessage("Analyse des tables en cours...");
+        // S'assurer que la connexion est établie
+        if (typeof grist === 'undefined') {
+          updateStatus("API Grist non disponible", "error");
+          return;
+        }
         
-        // Récupérer la liste des tables via l'API
+        updateStatus("Récupération des tables...", "pending");
+        
+        // Récupérer les tables
         const tables = await grist.docApi.listTables();
-        allTables = tables;
         
-        let htmlContent = '<h3>Tables disponibles:</h3>';
-        
+        // Afficher les tables
+        tableList.innerHTML = '';
         if (tables && tables.length > 0) {
-          htmlContent += '<table><tr><th>Nom de la table</th><th>Actions</th></tr>';
-          
           tables.forEach(table => {
-            htmlContent += `
-              <tr>
-                <td>${table}</td>
-                <td>
-                  <button onclick="testTable('${table}')">Tester cette table</button>
-                </td>
-              </tr>
-            `;
+            const li = document.createElement('li');
+            li.textContent = table;
+            tableList.appendChild(li);
           });
           
-          htmlContent += '</table>';
+          updateStatus(`${tables.length} tables trouvées!`, "success");
+          tableInfo.style.display = 'block';
           
-          // Remplir le sélecteur de tables
-          tableSelect.innerHTML = '';
-          tables.forEach(table => {
-            const option = document.createElement('option');
-            option.value = table;
-            option.textContent = table;
-            tableSelect.appendChild(option);
-          });
+          // Vérifier si demande_d_achat existe
+          const hasTargetTable = tables.includes('demande_d_achat');
+          console.log("[Vérificateur] Table demande_d_achat existe:", hasTargetTable);
           
-          // Afficher la section de test
-          testSection.classList.remove('hidden');
+          // Chercher des variantes possibles
+          const variants = tables.filter(t => 
+            t.toLowerCase().includes('demande') && 
+            t.toLowerCase().includes('achat')
+          );
+          
+          if (variants.length > 0) {
+            console.log("[Vérificateur] Variantes trouvées:", variants);
+          }
         } else {
-          htmlContent += '<p>Aucune table trouvée dans le document.</p>';
+          updateStatus("Aucune table trouvée dans le document", "error");
         }
-        
-        showResults(htmlContent);
-        showMessage(`${tables.length} tables trouvées`, "success");
       } catch (err) {
-        showMessage("Erreur lors de l'analyse des tables: " + err.message, "error");
-        console.error("Erreur d'analyse:", err);
+        updateStatus("Erreur lors de la récupération des tables: " + err.message, "error");
+        console.error("[Vérificateur] Erreur:", err);
       }
     }
     
-    // Fonction pour lister les colonnes
-    async function listColumnsFunc() {
-      try {
-        showMessage("Récupération des colonnes en cours...");
-        
-        // Récupérer les métadonnées des colonnes
-        const tablesData = await grist.docApi.fetchTable("_grist_Tables");
-        const columnsData = await grist.docApi.fetchTable("_grist_Tables_column");
-        
-        // Créer une carte des tables et leurs ID
-        tableMap = {};
-        if (tablesData && tablesData.id) {
-          for (let i = 0; i < tablesData.id.length; i++) {
-            tableMap[tablesData.tableId[i]] = tablesData.id[i];
-          }
-        }
-        
-        // Filtrer et organiser les colonnes par table
-        const columnsByTable = {};
-        
-        if (columnsData && columnsData.id) {
-          for (let i = 0; i < columnsData.id.length; i++) {
-            const parentId = columnsData.parentId[i];
-            const tableName = getTableNameById(parentId, tablesData);
-            
-            if (!columnsByTable[tableName]) {
-              columnsByTable[tableName] = [];
-            }
-            
-            columnsByTable[tableName].push({
-              id: columnsData.id[i],
-              colId: columnsData.colId[i],
-              type: columnsData.type[i]
-            });
-          }
-        }
-        
-        // Générer le HTML pour afficher les colonnes par table
-        let htmlContent = '<h3>Colonnes par table:</h3>';
-        
-        for (const tableName in columnsByTable) {
-          htmlContent += `<h4>Table: ${tableName} (ID: ${tableMap[tableName]})</h4>`;
-          htmlContent += '<table><tr><th>Nom de colonne</th><th>Type</th><th>Actions</th></tr>';
-          
-          columnsByTable[tableName].forEach(column => {
-            htmlContent += `
-              <tr>
-                <td>${column.colId}</td>
-                <td>${column.type}</td>
-                <td>
-                  <button onclick="testColumnWrite('${tableName}', '${column.colId}')">
-                    Tester écriture
-                  </button>
-                </td>
-              </tr>
-            `;
-          });
-          
-          htmlContent += '</table>';
-        }
-        
-        showResults(htmlContent);
-        showMessage("Colonnes récupérées avec succès", "success");
-      } catch (err) {
-        showMessage("Erreur lors de la récupération des colonnes: " + err.message, "error");
-        console.error("Erreur colonnes:", err);
-      }
-    }
+    // Ajouter les écouteurs d'événements
+    testBtn.addEventListener('click', testConnection);
+    listTablesBtn.addEventListener('click', listTables);
     
-    // Fonction pour afficher les métadonnées
-    async function showMetadataFunc() {
-      try {
-        showMessage("Récupération des métadonnées en cours...");
-        
-        const tablesData = await grist.docApi.fetchTable("_grist_Tables");
-        
-        let htmlContent = '<h3>Métadonnées des tables:</h3>';
-        
-        if (tablesData && tablesData.id) {
-          htmlContent += '<table><tr><th>ID</th><th>Nom</th><th>Table source</th></tr>';
-          
-          for (let i = 0; i < tablesData.id.length; i++) {
-            htmlContent += `
-              <tr>
-                <td>${tablesData.id[i]}</td>
-                <td>${tablesData.tableId[i]}</td>
-                <td>${tablesData.summarySourceTable[i] || 'N/A'}</td>
-              </tr>
-            `;
-          }
-          
-          htmlContent += '</table>';
-        } else {
-          htmlContent += '<p>Aucune métadonnée disponible.</p>';
-        }
-        
-        showResults(htmlContent);
-        showMessage("Métadonnées récupérées avec succès", "success");
-      } catch (err) {
-        showMessage("Erreur lors de la récupération des métadonnées: " + err.message, "error");
-        console.error("Erreur métadonnées:", err);
-      }
-    }
-    
-    // Fonction pour obtenir le nom de la table par ID
-    function getTableNameById(id, tablesData) {
-      if (!tablesData || !tablesData.id) return 'Unknown';
-      
-      for (let i = 0; i < tablesData.id.length; i++) {
-        if (tablesData.id[i] === id) {
-          return tablesData.tableId[i];
-        }
-      }
-      
-      return 'Unknown';
-    }
-    
-    // Fonction pour tester l'écriture dans une table
-    function testTable(tableName) {
-      tableSelect.value = tableName;
-      testSection.classList.remove('hidden');
-      window.scrollTo(0, document.body.scrollHeight);
-    }
-    
-    // Fonction pour tester l'écriture dans une colonne
-    async function testWriteFunc() {
-      try {
-        const tableName = tableSelect.value;
-        const rowId = parseInt(rowIdInput.value, 10);
-        const comment = commentInput.value;
-        
-        testResult.textContent = `Test d'écriture dans ${tableName}, ligne ${rowId}...`;
-        testResult.className = 'info';
-        
-        // Tester l'écriture avec l'API Grist
-        await grist.docApi.applyUserActions([
-          ["UpdateRecord", tableName, rowId, {"commentaires": comment}]
-        ]);
-        
-        testResult.textContent = `✅ Succès! Commentaire écrit dans ${tableName}, ligne ${rowId}.`;
-        testResult.className = 'success';
-      } catch (err) {
-        testResult.textContent = `❌ Erreur: ${err.message}`;
-        testResult.className = 'error';
-        console.error("Erreur de test:", err);
-        
-        // Si l'erreur concerne le nom de colonne, essayer d'autres variantes
-        if (err.message.includes("KeyError") && err.message.includes("commentaires")) {
-          try {
-            const tableName = tableSelect.value;
-            const rowId = parseInt(rowIdInput.value, 10);
-            const comment = commentInput.value;
-            
-            testResult.textContent = "La colonne 'commentaires' n'existe pas. Essai avec 'COMMENTAIRES'...";
-            testResult.className = 'info';
-            
-            // Essayer avec une variante en majuscules
-            await grist.docApi.applyUserActions([
-              ["UpdateRecord", tableName, rowId, {"COMMENTAIRES": comment}]
-            ]);
-            
-            testResult.textContent = `✅ Succès avec COMMENTAIRES! Commentaire écrit dans ${tableName}, ligne ${rowId}.`;
-            testResult.className = 'success';
-          } catch (err2) {
-            testResult.textContent = `❌ Toutes les tentatives ont échoué: ${err2.message}`;
-            testResult.className = 'error';
-          }
-        }
-      }
-    }
-    
-    // Ajouter les gestionnaires d'événements
-    analyzeTables.addEventListener('click', analyzeTablesFunc);
-    listColumns.addEventListener('click', listColumnsFunc);
-    showMetadata.addEventListener('click', showMetadataFunc);
-    testWriteBtn.addEventListener('click', testWriteFunc);
-    
-    // Exposer la fonction de test de colonne pour être appelée depuis le HTML
-    window.testColumnWrite = function(tableName, columnName) {
-      tableSelect.value = tableName;
-      testSection.classList.remove('hidden');
-      testResult.textContent = `Prêt à tester l'écriture dans ${tableName}, colonne ${columnName}`;
-      testResult.className = 'info';
-      window.scrollTo(0, document.body.scrollHeight);
-    };
-    
-    // Exposer la fonction de test de table pour être appelée depuis le HTML
-    window.testTable = function(tableName) {
-      tableSelect.value = tableName;
-      testSection.classList.remove('hidden');
-      testResult.textContent = `Prêt à tester l'écriture dans ${tableName}`;
-      testResult.className = 'info';
-      window.scrollTo(0, document.body.scrollHeight);
-    };
-    
-    // Initialisation
-    initGrist();
+    // Initialisation au chargement de la page
+    document.addEventListener('DOMContentLoaded', function() {
+      console.log("[Vérificateur] Widget chargé à", new Date().toLocaleTimeString());
+      setTimeout(initGrist, 500);
+    });
   </script>
 </body>
 </html>
