@@ -2,8 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Vérificateur de Déploiement</title>
-  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+  <title>Éditeur de commentaires (autonome)</title>
   <style>
     body {
       font-family: sans-serif;
@@ -23,36 +22,44 @@
       border-bottom: 2px solid #eee;
       padding-bottom: 10px;
     }
-    .version {
-      font-weight: bold;
-      color: #4285f4;
-      font-size: 1.2em;
-    }
-    .timestamp {
-      color: #666;
-      font-style: italic;
-      margin-bottom: 15px;
+    textarea {
+      width: 100%;
+      min-height: 120px;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+      margin-bottom: 10px;
+      box-sizing: border-box;
     }
     .status {
-      margin: 15px 0;
+      margin: 10px 0;
       padding: 10px;
       border-radius: 4px;
-      font-weight: bold;
-    }
-    .success {
-      background-color: #d4edda;
-      color: #155724;
-      border-left: 4px solid #28a745;
     }
     .error {
       background-color: #f8d7da;
       color: #721c24;
       border-left: 4px solid #dc3545;
     }
-    .pending {
-      background-color: #fff3cd;
-      color: #856404;
-      border-left: 4px solid #ffc107;
+    .success {
+      background-color: #d4edda;
+      color: #155724;
+      border-left: 4px solid #28a745;
+    }
+    .info {
+      background-color: #e2f3f8;
+      color: #0c5460;
+      border-left: 4px solid #17a2b8;
+    }
+    .version {
+      font-size: 12px;
+      color: #999;
+      text-align: right;
+      margin-top: 15px;
+    }
+    .buttons {
+      margin-top: 10px;
     }
     button {
       padding: 8px 15px;
@@ -61,155 +68,170 @@
       border: none;
       border-radius: 4px;
       cursor: pointer;
-      margin: 5px 0;
+      margin-right: 5px;
     }
     button:hover {
       background: #3b78e7;
     }
-    .table-info {
-      margin-top: 15px;
-      padding: 10px;
-      background: #f8f9fa;
-      border-radius: 4px;
-      font-family: monospace;
-      max-height: 150px;
-      overflow-y: auto;
-    }
-    #table-list {
-      list-style-type: none;
-      padding-left: 0;
-    }
-    #table-list li {
-      padding: 4px 0;
-      border-bottom: 1px solid #eee;
+    button:disabled {
+      background: #cccccc;
+      cursor: not-allowed;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <h2>Vérificateur de Déploiement</h2>
-    
-    <!-- Version du widget pour vérifier le déploiement -->
-    <div class="version">Version: 1.0.3</div>
-    <div class="timestamp">Déployé le: 21 Mai 2025 à 16:45</div>
-    
-    <!-- Statut de la connexion à Grist -->
-    <div id="status" class="status pending">Vérification de la connexion à Grist...</div>
-    
-    <!-- Boutons de test -->
-    <button id="test-connection">Tester la connexion</button>
-    <button id="list-tables">Lister les tables</button>
-    
-    <!-- Informations sur les tables -->
-    <div class="table-info" style="display: none;">
-      <h3>Tables disponibles:</h3>
-      <ul id="table-list"></ul>
+    <h2>Commentaire pour cette demande</h2>
+    <textarea id="comment" placeholder="Écris ton commentaire ici..."></textarea>
+    <div class="buttons">
+      <button id="save-btn">Enregistrer</button>
+      <button id="clear-btn">Effacer</button>
     </div>
+    <div id="status" class="status info">Prêt à saisir un commentaire</div>
+    <div class="version">v1.0.0 - 21/05/2025</div>
   </div>
 
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
   <script>
-    // Éléments du DOM
+    // Variables globales
+    let currentRecord = null;
+    const commentArea = document.getElementById('comment');
+    const saveBtn = document.getElementById('save-btn');
+    const clearBtn = document.getElementById('clear-btn');
     const statusEl = document.getElementById('status');
-    const testBtn = document.getElementById('test-connection');
-    const listTablesBtn = document.getElementById('list-tables');
-    const tableInfo = document.querySelector('.table-info');
-    const tableList = document.getElementById('table-list');
+    
+    // Clé pour le stockage local
+    function getStorageKey(recordId) {
+      return `grist_comment_${recordId}`;
+    }
     
     // Fonction pour mettre à jour le statut
-    function updateStatus(message, type) {
+    function updateStatus(message, type = 'info') {
       statusEl.textContent = message;
       statusEl.className = 'status ' + type;
     }
     
-    // Fonction pour initialiser la connexion à Grist
-    async function initGrist() {
+    // Fonction pour charger le commentaire depuis le stockage local
+    function loadComment(recordId) {
+      if (!recordId) return '';
+      
+      const key = getStorageKey(recordId);
+      return localStorage.getItem(key) || '';
+    }
+    
+    // Fonction pour sauvegarder le commentaire dans le stockage local
+    function saveComment(recordId, comment) {
+      if (!recordId) {
+        updateStatus("Aucun enregistrement sélectionné", "error");
+        return false;
+      }
+      
       try {
-        // Vérifier si l'API Grist est disponible
-        if (typeof grist === 'undefined') {
-          updateStatus("API Grist non disponible. Vérifiez que le widget est déployé dans Grist.", "error");
-          return false;
-        }
-        
-        // Initialiser l'API
-        await grist.ready({requiredAccess: 'read'});
-        updateStatus("Connexion à Grist établie avec succès!", "success");
-        console.log("[Vérificateur] Connexion établie à", new Date().toLocaleTimeString());
+        const key = getStorageKey(recordId);
+        localStorage.setItem(key, comment);
+        updateStatus("Commentaire enregistré localement", "success");
         return true;
       } catch (err) {
-        updateStatus("Erreur de connexion à Grist: " + err.message, "error");
-        console.error("[Vérificateur] Erreur:", err);
+        updateStatus("Erreur lors de l'enregistrement: " + err.message, "error");
+        console.error("Erreur d'enregistrement:", err);
         return false;
       }
     }
     
-    // Fonction pour tester la connexion
-    async function testConnection() {
-      updateStatus("Test de connexion en cours...", "pending");
-      const success = await initGrist();
+    // Fonction pour effacer le commentaire
+    function clearComment(recordId) {
+      if (!recordId) {
+        updateStatus("Aucun enregistrement sélectionné", "error");
+        return false;
+      }
       
-      if (success) {
-        // Afficher des informations sur la session
-        console.log("[Vérificateur] Widget déployé et connecté à Grist");
+      try {
+        const key = getStorageKey(recordId);
+        localStorage.removeItem(key);
+        commentArea.value = '';
+        updateStatus("Commentaire effacé", "info");
+        return true;
+      } catch (err) {
+        updateStatus("Erreur lors de l'effacement: " + err.message, "error");
+        console.error("Erreur d'effacement:", err);
+        return false;
       }
     }
     
-    // Fonction pour lister les tables
-    async function listTables() {
+    // Initialisation du widget
+    async function initWidget() {
       try {
-        // S'assurer que la connexion est établie
+        console.log("Initialisation du widget de commentaires (autonome)");
+        
+        // Vérifier si l'API est disponible
         if (typeof grist === 'undefined') {
-          updateStatus("API Grist non disponible", "error");
+          updateStatus("API Grist non disponible, mode hors ligne activé", "info");
           return;
         }
         
-        updateStatus("Récupération des tables...", "pending");
+        // Initialiser l'API
+        await grist.ready({requiredAccess: 'read'});
+        console.log("API Grist initialisée (mode lecture)");
         
-        // Récupérer les tables
-        const tables = await grist.docApi.listTables();
-        
-        // Afficher les tables
-        tableList.innerHTML = '';
-        if (tables && tables.length > 0) {
-          tables.forEach(table => {
-            const li = document.createElement('li');
-            li.textContent = table;
-            tableList.appendChild(li);
-          });
+        // Écouter les changements d'enregistrement
+        grist.onRecord(function(record) {
+          currentRecord = record;
           
-          updateStatus(`${tables.length} tables trouvées!`, "success");
-          tableInfo.style.display = 'block';
-          
-          // Vérifier si demande_d_achat existe
-          const hasTargetTable = tables.includes('demande_d_achat');
-          console.log("[Vérificateur] Table demande_d_achat existe:", hasTargetTable);
-          
-          // Chercher des variantes possibles
-          const variants = tables.filter(t => 
-            t.toLowerCase().includes('demande') && 
-            t.toLowerCase().includes('achat')
-          );
-          
-          if (variants.length > 0) {
-            console.log("[Vérificateur] Variantes trouvées:", variants);
+          if (record) {
+            // Charger le commentaire depuis le stockage local
+            const savedComment = loadComment(record.id);
+            commentArea.value = savedComment;
+            commentArea.disabled = false;
+            saveBtn.disabled = false;
+            clearBtn.disabled = false;
+            
+            updateStatus(savedComment ? 
+              "Commentaire chargé depuis le stockage local" : 
+              "Aucun commentaire enregistré pour cette demande", 
+              savedComment ? "success" : "info");
+              
+            console.log(`Enregistrement reçu: ID=${record.id}`);
+          } else {
+            commentArea.value = '';
+            commentArea.disabled = true;
+            saveBtn.disabled = true;
+            clearBtn.disabled = true;
+            
+            updateStatus("Aucun enregistrement sélectionné", "info");
+            console.log("Aucun enregistrement sélectionné");
           }
-        } else {
-          updateStatus("Aucune table trouvée dans le document", "error");
-        }
+        });
+        
       } catch (err) {
-        updateStatus("Erreur lors de la récupération des tables: " + err.message, "error");
-        console.error("[Vérificateur] Erreur:", err);
+        updateStatus("Erreur d'initialisation: " + err.message, "error");
+        console.error("Erreur d'initialisation:", err);
       }
     }
     
-    // Ajouter les écouteurs d'événements
-    testBtn.addEventListener('click', testConnection);
-    listTablesBtn.addEventListener('click', listTables);
-    
-    // Initialisation au chargement de la page
-    document.addEventListener('DOMContentLoaded', function() {
-      console.log("[Vérificateur] Widget chargé à", new Date().toLocaleTimeString());
-      setTimeout(initGrist, 500);
+    // Gestionnaires d'événements
+    saveBtn.addEventListener('click', function() {
+      if (currentRecord) {
+        saveComment(currentRecord.id, commentArea.value);
+      } else {
+        updateStatus("Aucun enregistrement sélectionné", "error");
+      }
     });
+    
+    clearBtn.addEventListener('click', function() {
+      if (currentRecord) {
+        clearComment(currentRecord.id);
+      } else {
+        updateStatus("Aucun enregistrement sélectionné", "error");
+      }
+    });
+    
+    // Enregistrer automatiquement lors de la modification
+    commentArea.addEventListener('input', function() {
+      updateStatus("Modification en cours...", "info");
+    });
+    
+    // Démarrer le widget
+    initWidget();
   </script>
 </body>
 </html>
