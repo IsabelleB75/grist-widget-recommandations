@@ -26,31 +26,22 @@
   <h2>Commentaire pour cette demande</h2>
   <textarea id="editor" placeholder="Écris ton commentaire ici..."></textarea>
   <div id="status"></div>
-
   <script>
     let currentRowId = null;
     let currentColumn = "commentaires";
-    let currentTable = "demande_d_achat"; // Utilise bien ce nom-là !
+    let currentTable = "demande_d_achat"; // Le nom exact de ta table
 
-    // Déclare à Grist qu'on veut accès complet et qu'on mappe la colonne "commentaires"
     grist.ready({
       requiredAccess: 'full',
-      columns: [{name: "commentaires", title: "Commentaire", type: "Text"}]
+      columns: [{ name: "commentaires", title: "Commentaire", type: "Text" }]
     });
 
     const textarea = document.getElementById("editor");
     const status = document.getElementById("status");
 
-    // Affiche le commentaire quand on change de ligne
     grist.onRecord((record, mappings) => {
       if (record && record.id) {
         currentRowId = record.id;
-        // Gestion du mapping de colonne/table si tu utilises le mapping Grist
-        if (mappings && mappings.tableId) {
-          currentTable = mappings.tableId;
-        } else {
-          currentTable = "demande_d_achat"; // fallback
-        }
         textarea.value = record.fields[currentColumn] || "";
         status.textContent = "Commentaire chargé.";
         status.classList.remove("error");
@@ -62,9 +53,8 @@
       }
     });
 
-    // Sauvegarde automatique à chaque modification du texte
     textarea.addEventListener("input", async () => {
-      if (!currentRowId || !currentTable) return;
+      if (!currentRowId) return;
       const newValue = textarea.value;
       try {
         await grist.docApi.applyUserActions([
