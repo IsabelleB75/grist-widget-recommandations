@@ -1,56 +1,119 @@
 <!DOCTYPE html>
-<html>
+<html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Éditeur de commentaires (autonome)</title>
+  <title>Éditeur de Commentaires</title>
   <style>
     body {
       font-family: sans-serif;
       margin: 0;
       padding: 15px;
-      background-color: #f5f5f5;
+      background-color: #f8f9fa;
     }
     .container {
       background: white;
-      padding: 15px;
+      padding: 20px;
       border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      max-width: 100%;
     }
     h2 {
       margin-top: 0;
-      color: #444;
-      border-bottom: 2px solid #eee;
+      color: #333;
+      font-size: 18px;
+      border-bottom: 2px solid #f0f0f0;
       padding-bottom: 10px;
+      margin-bottom: 15px;
     }
     textarea {
       width: 100%;
-      min-height: 120px;
-      padding: 8px;
+      min-height: 150px;
+      padding: 12px;
       border: 1px solid #ddd;
-      border-radius: 4px;
+      border-radius: 6px;
       font-size: 14px;
-      margin-bottom: 10px;
+      margin-bottom: 15px;
       box-sizing: border-box;
+      transition: border-color 0.3s;
+      resize: vertical;
+    }
+    textarea:focus {
+      border-color: #4285f4;
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.2);
     }
     .status {
-      margin: 10px 0;
-      padding: 10px;
-      border-radius: 4px;
+      margin: 15px 0;
+      padding: 12px;
+      border-radius: 6px;
+      font-size: 14px;
     }
     .error {
-      background-color: #f8d7da;
-      color: #721c24;
-      border-left: 4px solid #dc3545;
+      background-color: #fef0f0;
+      color: #b71c1c;
+      border-left: 4px solid #f44336;
     }
     .success {
-      background-color: #d4edda;
-      color: #155724;
-      border-left: 4px solid #28a745;
+      background-color: #f0f8f0;
+      color: #2e7d32;
+      border-left: 4px solid #4caf50;
     }
     .info {
-      background-color: #e2f3f8;
-      color: #0c5460;
-      border-left: 4px solid #17a2b8;
+      background-color: #f0f5fe;
+      color: #0d47a1;
+      border-left: 4px solid #2196f3;
+    }
+    .warning {
+      background-color: #fffde7;
+      color: #f57f17;
+      border-left: 4px solid #ffeb3b;
+    }
+    .buttons {
+      margin-top: 15px;
+      display: flex;
+      gap: 10px;
+    }
+    button {
+      padding: 10px 16px;
+      font-size: 14px;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      display: flex;
+      align-items: center;
+    }
+    button:hover {
+      opacity: 0.9;
+    }
+    button:disabled {
+      background-color: #cccccc;
+      cursor: not-allowed;
+      opacity: 0.7;
+    }
+    .save-btn {
+      background-color: #4285f4;
+    }
+    .clear-btn {
+      background-color: #f44336;
+    }
+    .sync-btn {
+      background-color: #4caf50;
+    }
+    .icon {
+      margin-right: 8px;
+      width: 18px;
+      height: 18px;
+      display: inline-block;
+    }
+    .record-info {
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 10px;
+      padding: 8px;
+      background-color: #f5f5f5;
+      border-radius: 4px;
     }
     .version {
       font-size: 12px;
@@ -58,149 +121,588 @@
       text-align: right;
       margin-top: 15px;
     }
-    .buttons {
-      margin-top: 10px;
+    .status-icon {
+      margin-right: 8px;
+      vertical-align: middle;
     }
-    button {
-      padding: 8px 15px;
-      background: #4285f4;
-      color: white;
-      border: none;
+    .autosave-indicator {
+      display: inline-block;
+      margin-left: 10px;
+      font-size: 12px;
+      color: #4caf50;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0% { opacity: 0.5; }
+      50% { opacity: 1; }
+      100% { opacity: 0.5; }
+    }
+    .hidden {
+      display: none;
+    }
+    .settings {
+      margin-top: 15px;
+      padding: 10px;
+      background-color: #f5f5f5;
       border-radius: 4px;
+    }
+    .settings input, .settings select {
+      margin-bottom: 10px;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .settings label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+      font-size: 14px;
+    }
+    .toggle-settings {
+      font-size: 12px;
+      color: #4285f4;
+      background: none;
+      border: none;
       cursor: pointer;
-      margin-right: 5px;
+      text-decoration: underline;
+      padding: 0;
+      margin-top: 10px;
+      display: block;
     }
-    button:hover {
-      background: #3b78e7;
+    /* Styles SVG inline pour éviter les problèmes de chargement */
+    .save-icon {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z'%3E%3C/path%3E%3Cpolyline points='17 21 17 13 7 13 7 21'%3E%3C/polyline%3E%3Cpolyline points='7 3 7 8 15 8'%3E%3C/polyline%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: center;
     }
-    button:disabled {
-      background: #cccccc;
-      cursor: not-allowed;
+    .clear-icon {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='3 6 5 6 21 6'%3E%3C/polyline%3E%3Cpath d='M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'%3E%3C/path%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: center;
+    }
+    .sync-icon {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21.5 2v6h-6'%3E%3C/path%3E%3Cpath d='M2.5 12a10 10 0 0 1 10-10h10'%3E%3C/path%3E%3Cpath d='M2.5 22v-6h6'%3E%3C/path%3E%3Cpath d='M21.5 12a10 10 0 0 1-10 10h-10'%3E%3C/path%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: center;
     }
   </style>
 </head>
 <body>
   <div class="container">
     <h2>Commentaire pour cette demande</h2>
-    <textarea id="comment" placeholder="Écris ton commentaire ici..."></textarea>
-    <div class="buttons">
-      <button id="save-btn">Enregistrer</button>
-      <button id="clear-btn">Effacer</button>
+    
+    <div id="record-info" class="record-info">
+      Aucun enregistrement sélectionné
     </div>
-    <div id="status" class="status info">Prêt à saisir un commentaire</div>
-    <div class="version">v1.0.0 - 21/05/2025</div>
+    
+    <textarea id="comment" placeholder="Écris ton commentaire ici..." disabled></textarea>
+    
+    <div id="status" class="status info">
+      <span class="status-icon">ℹ️</span>
+      Prêt à saisir un commentaire
+    </div>
+    
+    <div class="buttons">
+      <button id="save-btn" class="save-btn" disabled>
+        <span class="icon save-icon"></span>
+        Enregistrer
+      </button>
+      <button id="clear-btn" class="clear-btn" disabled>
+        <span class="icon clear-icon"></span>
+        Effacer
+      </button>
+      <button id="sync-btn" class="sync-btn" disabled>
+        <span class="icon sync-icon"></span>
+        Synchroniser
+      </button>
+    </div>
+    
+    <div id="autosave" class="autosave-indicator hidden">Sauvegarde automatique...</div>
+    
+    <button id="toggle-settings" class="toggle-settings">Afficher les paramètres</button>
+    
+    <div id="settings" class="settings hidden">
+      <label for="table-name">Nom de la table de commentaires:</label>
+      <input type="text" id="table-name" value="commentaires_demandes">
+      
+      <label for="user-name">Nom d'utilisateur:</label>
+      <input type="text" id="user-name" value="Utilisateur">
+      
+      <button id="apply-settings" class="save-btn" style="margin-top: 10px;">Appliquer</button>
+    </div>
+    
+    <div class="version">v3.0.0 - 21/05/2025 - Mode hybride (local + Grist)</div>
   </div>
 
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
   <script>
     // Variables globales
     let currentRecord = null;
+    let autosaveTimeout = null;
+    let gristAvailable = false;
+    const AUTOSAVE_DELAY = 1000; // Délai d'autosave en millisecondes
+    
+    // Éléments DOM
     const commentArea = document.getElementById('comment');
     const saveBtn = document.getElementById('save-btn');
     const clearBtn = document.getElementById('clear-btn');
+    const syncBtn = document.getElementById('sync-btn');
     const statusEl = document.getElementById('status');
+    const recordInfo = document.getElementById('record-info');
+    const autosaveIndicator = document.getElementById('autosave');
+    const toggleSettingsBtn = document.getElementById('toggle-settings');
+    const settingsPanel = document.getElementById('settings');
+    const tableNameInput = document.getElementById('table-name');
+    const userNameInput = document.getElementById('user-name');
+    const applySettingsBtn = document.getElementById('apply-settings');
     
-    // Clé pour le stockage local
+    // Préfixe de stockage pour éviter les collisions
+    const STORAGE_PREFIX = 'grist_comment_v3_';
+    
+    // Configuration de la table
+    let config = {
+      tableName: 'commentaires_demandes',
+      userName: 'Utilisateur'
+    };
+    
+    // Chargement de la configuration
+    function loadConfig() {
+      const savedConfig = localStorage.getItem(STORAGE_PREFIX + 'config');
+      if (savedConfig) {
+        try {
+          const parsedConfig = JSON.parse(savedConfig);
+          config = { ...config, ...parsedConfig };
+          
+          // Mettre à jour les champs de formulaire
+          tableNameInput.value = config.tableName;
+          userNameInput.value = config.userName;
+        } catch (err) {
+          console.error("Erreur lors du chargement de la configuration:", err);
+        }
+      }
+    }
+    
+    // Enregistrement de la configuration
+    function saveConfig() {
+      try {
+        localStorage.setItem(STORAGE_PREFIX + 'config', JSON.stringify(config));
+      } catch (err) {
+        console.error("Erreur lors de l'enregistrement de la configuration:", err);
+      }
+    }
+    
+    // Fonction pour obtenir la clé de stockage
     function getStorageKey(recordId) {
-      return `grist_comment_${recordId}`;
+      return `${STORAGE_PREFIX}${recordId}`;
     }
     
     // Fonction pour mettre à jour le statut
-    function updateStatus(message, type = 'info') {
-      statusEl.textContent = message;
-      statusEl.className = 'status ' + type;
+    function updateStatus(message, type = 'info', icon = '') {
+      const icons = {
+        'info': 'ℹ️',
+        'success': '✅',
+        'error': '❌',
+        'warning': '⚠️'
+      };
+      
+      statusEl.innerHTML = `<span class="status-icon">${icon || icons[type]}</span>${message}`;
+      statusEl.className = `status ${type}`;
+    }
+    
+    // Fonction pour afficher l'indicateur d'autosave
+    function showAutosaveIndicator(show = true) {
+      autosaveIndicator.classList.toggle('hidden', !show);
     }
     
     // Fonction pour charger le commentaire depuis le stockage local
-    function loadComment(recordId) {
+    function loadLocalComment(recordId) {
       if (!recordId) return '';
       
-      const key = getStorageKey(recordId);
-      return localStorage.getItem(key) || '';
+      try {
+        const key = getStorageKey(recordId);
+        const savedComment = localStorage.getItem(key);
+        return savedComment || '';
+      } catch (err) {
+        console.error("Erreur lors du chargement local:", err);
+        return '';
+      }
     }
     
-    // Fonction pour sauvegarder le commentaire dans le stockage local
-    function saveComment(recordId, comment) {
-      if (!recordId) {
-        updateStatus("Aucun enregistrement sélectionné", "error");
-        return false;
-      }
+    // Fonction pour sauvegarder le commentaire localement
+    function saveLocalComment(recordId, comment) {
+      if (!recordId) return false;
       
       try {
         const key = getStorageKey(recordId);
         localStorage.setItem(key, comment);
-        updateStatus("Commentaire enregistré localement", "success");
         return true;
       } catch (err) {
-        updateStatus("Erreur lors de l'enregistrement: " + err.message, "error");
-        console.error("Erreur d'enregistrement:", err);
+        console.error("Erreur d'enregistrement local:", err);
         return false;
       }
     }
     
-    // Fonction pour effacer le commentaire
-    function clearComment(recordId) {
+    // Fonction pour effacer le commentaire local
+    function clearLocalComment(recordId) {
+      if (!recordId) return false;
+      
+      try {
+        const key = getStorageKey(recordId);
+        localStorage.removeItem(key);
+        return true;
+      } catch (err) {
+        console.error("Erreur d'effacement local:", err);
+        return false;
+      }
+    }
+    
+    // Fonction pour charger le commentaire depuis Grist
+    async function loadGristComment(recordId) {
+      if (!gristAvailable || !recordId) return null;
+      
+      try {
+        // Rechercher un commentaire existant pour cet ID de demande
+        const queryResult = await grist.docApi.fetchTable(config.tableName, {
+          filter: { id_demande: recordId }
+        });
+        
+        // Si nous trouvons un commentaire existant
+        if (queryResult && queryResult.id && queryResult.id.length > 0) {
+          // Retourner le commentaire le plus récent (en supposant qu'il y en a plusieurs)
+          const latestIndex = queryResult.id.length - 1;
+          return {
+            commentId: queryResult.id[latestIndex],
+            text: queryResult.texte[latestIndex] || '',
+            date: queryResult.date_creation[latestIndex] || '',
+            user: queryResult.utilisateur[latestIndex] || ''
+          };
+        }
+        
+        return null;
+      } catch (err) {
+        console.error("Erreur lors du chargement depuis Grist:", err);
+        return null;
+      }
+    }
+    
+    // Fonction pour sauvegarder le commentaire dans Grist
+    async function saveGristComment(recordId, comment) {
+      if (!gristAvailable || !recordId) return false;
+      
+      try {
+        // Rechercher un commentaire existant
+        const existingComment = await loadGristComment(recordId);
+        
+        if (existingComment) {
+          // Mettre à jour le commentaire existant
+          await grist.docApi.applyUserActions([
+            ["UpdateRecord", config.tableName, existingComment.commentId, {
+              texte: comment,
+              date_creation: new Date().toISOString()
+            }]
+          ]);
+        } else {
+          // Créer un nouveau commentaire
+          await grist.docApi.applyUserActions([
+            ["AddRecord", config.tableName, null, {
+              id_demande: recordId,
+              texte: comment,
+              date_creation: new Date().toISOString(),
+              utilisateur: config.userName
+            }]
+          ]);
+        }
+        
+        return true;
+      } catch (err) {
+        console.error("Erreur lors de l'enregistrement dans Grist:", err);
+        updateStatus("Erreur de sauvegarde dans Grist: " + err.message, "error");
+        return false;
+      }
+    }
+    
+    // Fonction pour effacer le commentaire dans Grist
+    async function clearGristComment(recordId) {
+      if (!gristAvailable || !recordId) return false;
+      
+      try {
+        // Rechercher un commentaire existant
+        const existingComment = await loadGristComment(recordId);
+        
+        if (existingComment) {
+          // Supprimer le commentaire
+          await grist.docApi.applyUserActions([
+            ["RemoveRecord", config.tableName, existingComment.commentId]
+          ]);
+          return true;
+        }
+        
+        return false;
+      } catch (err) {
+        console.error("Erreur lors de la suppression dans Grist:", err);
+        return false;
+      }
+    }
+    
+    // Fonction principale de sauvegarde
+    async function saveComment(recordId, comment, showMessage = true) {
       if (!recordId) {
         updateStatus("Aucun enregistrement sélectionné", "error");
         return false;
       }
       
-      try {
-        const key = getStorageKey(recordId);
-        localStorage.removeItem(key);
-        commentArea.value = '';
-        updateStatus("Commentaire effacé", "info");
-        return true;
-      } catch (err) {
-        updateStatus("Erreur lors de l'effacement: " + err.message, "error");
-        console.error("Erreur d'effacement:", err);
+      // Toujours sauvegarder localement
+      const localSaved = saveLocalComment(recordId, comment);
+      
+      // Essayer de sauvegarder dans Grist si disponible
+      let gristSaved = false;
+      if (gristAvailable) {
+        gristSaved = await saveGristComment(recordId, comment);
+      }
+      
+      if (showMessage) {
+        if (gristAvailable && gristSaved) {
+          updateStatus("Commentaire enregistré localement et synchronisé", "success");
+        } else if (localSaved) {
+          updateStatus("Commentaire enregistré localement uniquement", "success");
+        } else {
+          updateStatus("Erreur lors de l'enregistrement", "error");
+        }
+      }
+      
+      return localSaved || gristSaved;
+    }
+    
+    // Fonction principale d'effacement
+    async function clearComment(recordId) {
+      if (!recordId) {
+        updateStatus("Aucun enregistrement sélectionné", "error");
         return false;
       }
+      
+      // Effacer localement
+      const localCleared = clearLocalComment(recordId);
+      
+      // Essayer d'effacer dans Grist si disponible
+      let gristCleared = false;
+      if (gristAvailable) {
+        gristCleared = await clearGristComment(recordId);
+      }
+      
+      commentArea.value = '';
+      
+      if (gristAvailable && gristCleared) {
+        updateStatus("Commentaire effacé localement et dans Grist", "info");
+      } else if (localCleared) {
+        updateStatus("Commentaire effacé localement uniquement", "info");
+      } else {
+        updateStatus("Erreur lors de l'effacement", "error");
+      }
+      
+      return localCleared || gristCleared;
+    }
+    
+    // Fonction pour synchroniser avec Grist
+    async function syncWithGrist(recordId) {
+      if (!gristAvailable || !recordId) {
+        updateStatus("Impossible de synchroniser - Grist non disponible", "warning");
+        return false;
+      }
+      
+      try {
+        // Récupérer le commentaire local
+        const localComment = loadLocalComment(recordId);
+        
+        // Récupérer le commentaire Grist
+        const gristComment = await loadGristComment(recordId);
+        
+        // Si nous avons un commentaire local mais pas dans Grist, l'envoyer
+        if (localComment && !gristComment) {
+          await saveGristComment(recordId, localComment);
+          updateStatus("Commentaire local synchronisé avec Grist", "success");
+          return true;
+        }
+        
+        // Si nous avons un commentaire dans Grist mais pas en local, le récupérer
+        if (!localComment && gristComment) {
+          saveLocalComment(recordId, gristComment.text);
+          commentArea.value = gristComment.text;
+          updateStatus("Commentaire récupéré depuis Grist", "success");
+          return true;
+        }
+        
+        // Si nous avons les deux, prendre le plus récent
+        if (localComment && gristComment) {
+          // Pour simplifier, nous utilisons toujours le commentaire local
+          await saveGristComment(recordId, localComment);
+          updateStatus("Commentaire synchronisé", "success");
+          return true;
+        }
+        
+        updateStatus("Aucun commentaire à synchroniser", "info");
+        return false;
+      } catch (err) {
+        updateStatus("Erreur lors de la synchronisation: " + err.message, "error");
+        console.error("Erreur de synchronisation:", err);
+        return false;
+      }
+    }
+    
+    // Fonction pour configurer l'autosave
+    function setupAutosave() {
+      commentArea.addEventListener('input', function() {
+        showAutosaveIndicator(true);
+        
+        // Annuler tout timeout existant
+        if (autosaveTimeout) {
+          clearTimeout(autosaveTimeout);
+        }
+        
+        // Définir un nouveau timeout
+        autosaveTimeout = setTimeout(function() {
+          if (currentRecord) {
+            saveComment(currentRecord.id, commentArea.value, false);
+            showAutosaveIndicator(false);
+            updateStatus("Enregistré automatiquement", "success");
+          }
+        }, AUTOSAVE_DELAY);
+      });
+    }
+    
+    // Fonction pour mettre à jour les informations de l'enregistrement
+    function updateRecordInfo(record) {
+      if (!record) {
+        recordInfo.textContent = "Aucun enregistrement sélectionné";
+        return;
+      }
+      
+      recordInfo.textContent = `Demande #${record.id}`;
+      
+      // Si des champs spécifiques sont disponibles, les afficher
+      if (record.fields) {
+        const fieldsToShow = ['titre', 'date', 'statut', 'nom'];
+        const displayFields = [];
+        
+        fieldsToShow.forEach(field => {
+          if (record.fields[field]) {
+            displayFields.push(`${field}: ${record.fields[field]}`);
+          }
+        });
+        
+        if (displayFields.length > 0) {
+          recordInfo.textContent += ` (${displayFields.join(' | ')})`;
+        }
+      }
+    }
+    
+    // Fonction pour charger le commentaire
+    async function loadComment(recordId) {
+      // Toujours charger depuis le stockage local
+      const localComment = loadLocalComment(recordId);
+      
+      // Si Grist est disponible, vérifier s'il y a un commentaire
+      if (gristAvailable) {
+        const gristComment = await loadGristComment(recordId);
+        
+        if (gristComment && gristComment.text) {
+          // Si nous avons un commentaire local mais différent de Grist
+          if (localComment && localComment !== gristComment.text) {
+            // Pour simplifier, utiliser le commentaire local
+            return localComment;
+          }
+          
+          // Sinon utiliser le commentaire Grist
+          return gristComment.text;
+        }
+      }
+      
+      // Par défaut, retourner le commentaire local
+      return localComment;
     }
     
     // Initialisation du widget
     async function initWidget() {
       try {
-        console.log("Initialisation du widget de commentaires (autonome)");
+        console.log("Initialisation du widget de commentaires v3.0.0");
+        
+        // Charger la configuration
+        loadConfig();
         
         // Vérifier si l'API est disponible
         if (typeof grist === 'undefined') {
-          updateStatus("API Grist non disponible, mode hors ligne activé", "info");
-          return;
+          updateStatus("API Grist non disponible, mode local uniquement", "warning");
+          syncBtn.disabled = true;
+        } else {
+          // Initialiser l'API
+          try {
+            await grist.ready({requiredAccess: 'full'});
+            gristAvailable = true;
+            console.log("API Grist initialisée (mode complet)");
+            updateStatus("Connecté à Grist - Mode hybride actif", "success");
+          } catch (err) {
+            console.error("Erreur lors de l'initialisation de Grist:", err);
+            updateStatus("Erreur de connexion à Grist - Mode local uniquement", "warning");
+            syncBtn.disabled = true;
+          }
         }
         
-        // Initialiser l'API
-        await grist.ready({requiredAccess: 'read'});
-        console.log("API Grist initialisée (mode lecture)");
+        // Si Grist est disponible, vérifier que la table existe
+        if (gristAvailable) {
+          try {
+            const tables = await grist.docApi.listTables();
+            
+            if (!tables.includes(config.tableName)) {
+              updateStatus(`Table '${config.tableName}' introuvable - Mode local uniquement`, "warning");
+              syncBtn.disabled = true;
+              gristAvailable = false;
+            }
+          } catch (err) {
+            console.error("Erreur lors de la vérification des tables:", err);
+          }
+        }
         
         // Écouter les changements d'enregistrement
-        grist.onRecord(function(record) {
-          currentRecord = record;
-          
-          if (record) {
-            // Charger le commentaire depuis le stockage local
-            const savedComment = loadComment(record.id);
-            commentArea.value = savedComment;
-            commentArea.disabled = false;
-            saveBtn.disabled = false;
-            clearBtn.disabled = false;
+        if (gristAvailable) {
+          grist.onRecord(async function(record) {
+            currentRecord = record;
             
-            updateStatus(savedComment ? 
-              "Commentaire chargé depuis le stockage local" : 
-              "Aucun commentaire enregistré pour cette demande", 
-              savedComment ? "success" : "info");
+            if (record) {
+              updateRecordInfo(record);
               
-            console.log(`Enregistrement reçu: ID=${record.id}`);
-          } else {
-            commentArea.value = '';
-            commentArea.disabled = true;
-            saveBtn.disabled = true;
-            clearBtn.disabled = true;
-            
-            updateStatus("Aucun enregistrement sélectionné", "info");
-            console.log("Aucun enregistrement sélectionné");
-          }
-        });
+              // Charger le commentaire
+              const savedComment = await loadComment(record.id);
+              commentArea.value = savedComment;
+              commentArea.disabled = false;
+              saveBtn.disabled = false;
+              clearBtn.disabled = false;
+              syncBtn.disabled = false;
+              
+              if (savedComment) {
+                updateStatus("Commentaire chargé", "success");
+              } else {
+                updateStatus("Aucun commentaire pour cette demande", "info");
+              }
+                
+              console.log(`Enregistrement reçu: ID=${record.id}`);
+            } else {
+              updateRecordInfo(null);
+              
+              commentArea.value = '';
+              commentArea.disabled = true;
+              saveBtn.disabled = true;
+              clearBtn.disabled = true;
+              syncBtn.disabled = true;
+              
+              updateStatus("Aucun enregistrement sélectionné", "info");
+              console.log("Aucun enregistrement sélectionné");
+            }
+          });
+        }
+        
+        // Configurer l'autosave
+        setupAutosave();
         
       } catch (err) {
         updateStatus("Erreur d'initialisation: " + err.message, "error");
@@ -219,19 +721,42 @@
     
     clearBtn.addEventListener('click', function() {
       if (currentRecord) {
-        clearComment(currentRecord.id);
+        if (confirm("Êtes-vous sûr de vouloir effacer ce commentaire ?")) {
+          clearComment(currentRecord.id);
+        }
       } else {
         updateStatus("Aucun enregistrement sélectionné", "error");
       }
     });
     
-    // Enregistrer automatiquement lors de la modification
-    commentArea.addEventListener('input', function() {
-      updateStatus("Modification en cours...", "info");
+    syncBtn.addEventListener('click', function() {
+      if (currentRecord) {
+        syncWithGrist(currentRecord.id);
+      } else {
+        updateStatus("Aucun enregistrement sélectionné", "error");
+      }
+    });
+    
+    // Gestionnaire pour afficher/masquer les paramètres
+    toggleSettingsBtn.addEventListener('click', function() {
+      const isHidden = settingsPanel.classList.contains('hidden');
+      settingsPanel.classList.toggle('hidden', !isHidden);
+      toggleSettingsBtn.textContent = isHidden ? 'Masquer les paramètres' : 'Afficher les paramètres';
+    });
+    
+    // Gestionnaire pour appliquer les paramètres
+    applySettingsBtn.addEventListener('click', function() {
+      config.tableName = tableNameInput.value.trim() || 'commentaires_demandes';
+      config.userName = userNameInput.value.trim() || 'Utilisateur';
+      
+      saveConfig();
+      
+      // Réinitialiser le widget avec les nouveaux paramètres
+      updateStatus("Paramètres appliqués, réinitialisation...", "info");
+      setTimeout(initWidget, 500);
     });
     
     // Démarrer le widget
-    initWidget();
-  </script>
-</body>
-</html>
+    document.addEventListener('DOMContentLoaded', function() {
+      setTimeout(initWidget, 500);
+    });
