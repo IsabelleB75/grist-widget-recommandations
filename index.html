@@ -1,10 +1,78 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta http-equiv="refresh" content="0; url=grist-widget-compatible.html">
-  <title>Widget Recommandations Grist</title>
+  <meta charset="UTF-8">
+  <title>Éditeur de commentaire Grist</title>
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+  <style>
+    body { font-family: sans-serif; background: #f4f7fa; }
+    h2 { margin-bottom: 0.2em; }
+    textarea {
+      width: 100%; min-height: 150px;
+      background: #ffe6f0; border: 2px solid #336;
+      font-size: 1em; padding: 0.5em;
+      box-sizing: border-box;
+      margin-bottom: 0.5em;
+    }
+    #status {
+      font-style: italic;
+      color: green;
+      margin-bottom: 0.5em;
+    }
+    #status.error { color: red; }
+  </style>
 </head>
 <body>
-  <p>Redirection vers le widget de recommandations...</p>
+  <h2>Commentaire pour cette demande</h2>
+  <textarea id="editor" placeholder="Écris ton commentaire ici..."></textarea>
+  <div id="status"></div>
+
+  <script>
+    let currentRowId = null;
+    let currentColumn = "commentaires";
+
+    // Déclare à Grist qu'on veut accès complet et qu'on mappe la colonne "commentaires"
+    grist.ready({
+      requiredAccess: 'full',
+      columns: [{name: "commentaires", title: "Commentaire", type: "Text"}]
+    });
+
+    const textarea = document.getElementById("editor");
+    const status = document.getElementById("status");
+
+    // Affiche le commentaire quand on change de ligne
+    grist.onRecord((record, mappings) => {
+      if (record && record.id) {
+        currentRowId = record.id;
+        textarea.value = record.fields[currentColumn] || "";
+        status.textContent = "Commentaire chargé.";
+        status.classList.remove("error");
+      } else {
+        currentRowId = null;
+        textarea.value = "";
+        status.textContent = "Aucune ligne sélectionnée.";
+        status.classList.remove("error");
+      }
+    });
+
+    // Sauvegarde automatique à chaque modification du texte
+    textarea.addEventListener("input", async () => {
+      if (!currentRowId) return;
+      const newValue = textarea.value;
+
+      try {
+        await grist.docApi.applyUserActions([
+          ["UpdateRecord", "demande_d_achat", currentRowId, { [currentColumn]: newValue }]
+        ]);
+        status.textContent = "✅ Enregistré !";
+        status.classList.remove("error");
+      } catch (err) {
+        console.error("Erreur d'enregistrement :", err);
+        status.textContent = "❌ Erreur d'enregistrement : " + (err?.message || err);
+        status.classList.add("error");
+      }
+    });
+  </script>
 </body>
 </html>
+
